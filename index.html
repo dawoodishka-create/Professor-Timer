@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Professor Timer - Speedcubing Timer & Analytics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+
+  <!-- Firebase SDK (Auth only, no App Check needed for local) -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut,
+      onAuthStateChanged
+    } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+
+    // ── REPLACE with your own Firebase project config ──────────────────────────
+    // 1. Go to https://console.firebase.google.com
+    // 2. Create / select a project → Project Settings → Your apps → Web app
+    // 3. Copy the firebaseConfig object and paste it below.
+    // ──────────────────────────────────────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey:            "YOUR_API_KEY",
+      authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId:         "YOUR_PROJECT_ID",
+      storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId:             "YOUR_APP_ID"
+    };
+
+    const app  = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    window._firebaseAuth = auth;
+    window._googleProvider = provider;
+    window._signInWithPopup = signInWithPopup;
+    window._signOut = signOut;
+
+    onAuthStateChanged(auth, (user) => {
+      window._professorTimerUser = user || null;
+      document.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { user } }));
+    });
+  </script>
+</head>
+<body class="theme-cyber-dark">
+
+  <!-- ================= App Navigation Header ================= -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand-container">
+        <!-- SVG Cube Icon -->
+        <svg class="cube-logo-icon" viewBox="0 0 32 32" fill="none">
+          <path d="M16 2L3 8.5V23.5L16 30L29 23.5V8.5L16 2Z" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+          <path d="M16 2V16M16 16L3 8.5M16 16L29 8.5M16 16V30" stroke="#0ea5e9" stroke-width="2"/>
+          <polygon points="16,4 27,9.5 16,15 5,9.5" fill="#f8fafc" fill-opacity="0.9"/>
+          <polygon points="5,11.5 15,17 15,28 5,22.5" fill="#10b981" fill-opacity="0.9"/>
+          <polygon points="17,17 27,11.5 27,22.5 17,28" fill="#ef4444" fill-opacity="0.9"/>
+        </svg>
+        <span class="brand-title">Professor <span class="brand-accent">Timer</span></span>
+        <span class="brand-badge">PRO</span>
+      </div>
+
+      <!-- Session Selector & Menu -->
+      <div class="session-controls">
+        <select id="session-select" class="custom-select" title="Switch active session"></select>
+        <button id="btn-new-session" class="btn-icon-action" title="Create new session">+</button>
+        <div class="dropdown-relative">
+          <button id="btn-session-actions" class="btn-icon-action" title="Session options">⋮</button>
+          <div id="session-menu-dropdown" class="dropdown-menu">
+            <button id="action-rename-session" class="dropdown-item">✏️ Rename Session</button>
+            <button id="action-clear-session" class="dropdown-item danger-item">🧹 Clear Solves</button>
+            <button id="action-delete-session" class="dropdown-item danger-item">🗑️ Delete Session</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Puzzle Event Selector -->
+      <div class="puzzle-controls">
+        <select id="puzzle-select" class="custom-select" title="Select puzzle">
+          <option value="333">3x3x3 Cube</option>
+          <option value="222">2x2x2 Cube</option>
+          <option value="444">4x4x4 Cube</option>
+          <option value="pyra">Pyraminx</option>
+          <option value="skewb">Skewb</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Center Navigation Tabs -->
+    <div class="header-center">
+      <nav class="nav-tab-list">
+        <button class="nav-tab active" data-view="view-timer">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Timer</span>
+        </button>
+        <button class="nav-tab" data-view="view-analytics">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span>Analytics</span>
+        </button>
+        <button class="nav-tab" data-view="view-algorithms">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span>Algorithms</span>
+        </button>
+        <button class="nav-tab" data-view="view-friends">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Friends</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Header Right Quick Actions -->
+    <div class="header-right">
+      <button id="btn-manual-entry" class="btn-icon-action" title="Enter time manually">⌨️</button>
+      <button id="btn-open-settings" class="btn-icon-action" title="Settings">⚙️</button>
+
+      <!-- Google Sign-In / User Avatar -->
+      <div class="auth-container">
+        <!-- Signed-out state -->
+        <button id="btn-google-signin" class="btn-google-signin" title="Sign in with Google">
+          <svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Sign in
+        </button>
+        <!-- Signed-in state (hidden by default) -->
+        <div id="auth-user-info" class="auth-user-info" style="display:none;">
+          <img id="auth-avatar" class="auth-avatar" src="" alt="Avatar">
+          <span id="auth-name" class="auth-name"></span>
+          <button id="btn-signout" class="btn-signout" title="Sign out">↩</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= Main App Views ================= -->
+  <main class="app-view-container">
+
+    <!-- 1. TIMER VIEW -->
+    <section id="view-timer" class="app-view active">
+      
+      <!-- Scramble Display Box -->
+      <div class="scramble-container">
+        <div class="scramble-top-row">
+          <div class="scramble-text-wrapper">
+            <div id="scramble-text" class="scramble-text">Generating scramble...</div>
+          </div>
+          <div class="scramble-actions">
+            <button id="btn-next-scramble" class="btn-scramble-action" title="Next scramble (Alt+N)">🔄 Next</button>
+            <button id="btn-copy-scramble" class="btn-scramble-action" title="Copy scramble">📋 Copy</button>
+            <button id="btn-toggle-net" class="btn-scramble-action" title="Toggle Scramble Preview">🔍 Preview</button>
+          </div>
+        </div>
+
+        <!-- Scramble Visualizer (2D Net) -->
+        <div id="scramble-net-container" class="scramble-net-container">
+          <div id="scramble-net-svg"></div>
+        </div>
+      </div>
+
+      <!-- Main Interactive Timer Zone -->
+      <div id="timer-touch-area" class="timer-hero-section">
+        <div class="timer-display-box">
+          <div id="timer-display" class="timer-digits">0.00</div>
+          <div id="timer-status" class="timer-status-msg">Press and hold [Space] to start</div>
+        </div>
+
+        <!-- Post-Solve Quick Bar (+2, DNF, Delete) -->
+        <div id="post-solve-actions" class="post-solve-actions" style="display: none;">
+          <button id="btn-penalty-plus2" class="btn-post-action" title="Add 2-second penalty (Alt+2)">+2</button>
+          <button id="btn-penalty-dnf" class="btn-post-action" title="Mark Did Not Finish (Alt+D)">DNF</button>
+          <button id="btn-delete-last" class="btn-post-action" title="Delete last solve (Alt+Z)">🗑️ Delete</button>
+        </div>
+      </div>
+
+      <!-- Quick Summary Stats Bar -->
+      <div class="quick-stats-bar">
+        <div class="stat-pill">
+          <span class="stat-label">Solves</span>
+          <span id="stat-count" class="stat-value">0</span>
+        </div>
+        <div class="stat-pill highlight-pb">
+          <span class="stat-label">PB Single</span>
+          <span id="stat-pb-single" class="stat-value">-</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-label">Current Ao5</span>
+          <span id="stat-current-ao5" class="stat-value">-</span>
+        </div>
+        <div class="stat-pill highlight-pb">
+          <span class="stat-label">Best Ao5</span>
+          <span id="stat-best-ao5" class="stat-value">-</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-label">Current Ao12</span>
+          <span id="stat-current-ao12" class="stat-value">-</span>
+        </div>
+        <div class="stat-pill highlight-pb">
+          <span class="stat-label">Best Ao12</span>
+          <span id="stat-best-ao12" class="stat-value">-</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-label">Mean</span>
+          <span id="stat-mean" class="stat-value">-</span>
+        </div>
+      </div>
+
+      <!-- Bottom Solves Scroll Panel -->
+      <div class="bottom-panels">
+        <div class="panel-header">
+          <span class="panel-title">Session Solves</span>
+          <span class="panel-hint" style="font-size: 0.78rem; color: var(--text-dim);">Click solve for scramble details</span>
+        </div>
+        <div id="solves-list" class="solves-horizontal-scroll">
+          <div class="empty-solves-msg">No solves yet. Press spacebar to start!</div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 2. ANALYTICS & PERFORMANCE CHART VIEW -->
+    <section id="view-analytics" class="app-view">
+      <div class="analytics-header">
+        <h2 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 6px;">Performance Analytics</h2>
+        <p style="color: var(--text-dim); font-size: 0.9rem;">Track your speed progression, rolling averages, and personal best trendlines.</p>
+      </div>
+
+      <!-- Interactive Chart Card -->
+      <div class="chart-card">
+        <div class="chart-wrapper">
+          <canvas id="solves-chart-canvas"></canvas>
+        </div>
+        <div id="chart-tooltip" class="chart-tooltip"></div>
+      </div>
+    </section>
+
+    <!-- 3. ALGORITHM TRAINER VIEW -->
+    <section id="view-algorithms" class="app-view">
+      <div class="analytics-header">
+        <h2 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 6px;">Speedcubing Algorithm Library</h2>
+        <p style="color: var(--text-dim); font-size: 0.9rem;">Official PLL & OLL algorithm formulas with alternatives.</p>
+      </div>
+
+      <div class="alg-toolbar">
+        <input type="text" id="alg-search-input" class="alg-search-input" placeholder="Search algorithms (e.g. T Perm, Sune, R U R')...">
+        <select id="alg-group-filter" class="custom-select" style="background: var(--bg-surface); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+          <option value="all">All Groups</option>
+          <option value="PLL">All PLLs</option>
+          <option value="Edges Only">PLL - Edges Only</option>
+          <option value="Corners Only">PLL - Corners Only</option>
+          <option value="Adjacent Swap">PLL - Adjacent Swap</option>
+          <option value="Diagonal Swap">PLL - Diagonal Swap</option>
+          <option value="G Perms">PLL - G Perms</option>
+          <option value="OLL">All OLLs</option>
+          <option value="Edges Oriented (2-Look)">OLL - 2-Look</option>
+        </select>
+      </div>
+
+      <div id="alg-list-container" class="alg-cards-grid"></div>
+    </section>
+
+    <!-- 4. FRIENDS & LEADERBOARD VIEW -->
+    <section id="view-friends" class="app-view">
+      <div class="analytics-header">
+        <h2 style="font-size: 1.5rem; font-weight: 800; margin-bottom: 6px;">Friends &amp; Leaderboard</h2>
+        <p style="color: var(--text-dim); font-size: 0.9rem;">Compare your PBs with friends. Sign in with Google to sync across devices.</p>
+      </div>
+
+      <!-- Sign-in nudge (shown when logged out) -->
+      <div id="friends-signin-nudge" class="friends-signin-nudge">
+        <div class="nudge-icon">🔑</div>
+        <div class="nudge-text">
+          <strong>Sign in with Google</strong> to sync your times and challenge friends online.<br>
+          <span style="font-size:0.85rem; color:var(--text-dim);">You can still add local friends without signing in.</span>
+        </div>
+        <button id="btn-friends-signin" class="btn-google-signin btn-google-signin-lg">
+          <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Sign in with Google
+        </button>
+      </div>
+
+      <!-- Add Friend Form -->
+      <div class="friends-add-card">
+        <div class="friends-add-title">➕ Add a Friend</div>
+        <form id="add-friend-form" class="add-friend-form">
+          <input type="text" id="friend-name-input" class="alg-search-input" placeholder="Name (required)" required style="flex:1;min-width:120px;">
+          <input type="email" id="friend-email-input" class="alg-search-input" placeholder="Email (optional)" style="flex:1.5;min-width:160px;">
+          <input type="text" id="friend-pb-input" class="alg-search-input" placeholder="PB (e.g. 14.82)" style="flex:0.8;min-width:100px;">
+          <button type="submit" class="btn-scramble-action" style="background:var(--accent-primary);color:#fff;border:none;white-space:nowrap;">Add Friend</button>
+        </form>
+      </div>
+
+      <!-- Leaderboard Table -->
+      <div class="friends-leaderboard-card">
+        <div class="friends-leaderboard-header">
+          <span class="friends-lb-title">🏆 Leaderboard</span>
+          <button id="btn-refresh-leaderboard" class="btn-scramble-action" style="font-size:0.8rem;padding:5px 10px;">🔄 Refresh</button>
+        </div>
+        <div id="leaderboard-list" class="leaderboard-list">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
+      <!-- Friends List -->
+      <div class="friends-list-card">
+        <div class="friends-lb-title" style="margin-bottom:12px;">👥 My Friends</div>
+        <div id="friends-list" class="friends-entries">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= Modals ================= -->
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Settings & Customization</h3>
+        <button id="btn-close-settings" class="btn-close-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        
+        <div class="settings-group">
+          <div class="settings-group-title">Theme & Appearance</div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Color Theme</div>
+              <div class="setting-desc">Select your preferred color palette</div>
+            </div>
+            <select id="setting-theme" class="custom-select" style="background: var(--bg-surface); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-subtle);">
+              <option value="cyber-dark">Cyber Dark</option>
+              <option value="midnight-indigo">Midnight Indigo</option>
+              <option value="amoled-black">AMOLED Black</option>
+              <option value="sunset">Sunset Warm</option>
+              <option value="light">Light Minimal</option>
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Zen Mode</div>
+              <div class="setting-desc">Dim non-essential UI while timer is running</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="setting-zen-mode" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">Timer & Inspection</div>
+          
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">WCA 15s Inspection</div>
+              <div class="setting-desc">Standard 15-second inspection with audio cues</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="setting-inspection">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Sound & Voice Effects</div>
+              <div class="setting-desc">Voice alerts for inspection and solve bleeps</div>
+            </div>
+            <select id="setting-sound" class="custom-select" style="background: var(--bg-surface); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-subtle);">
+              <option value="all">Voice + Sounds</option>
+              <option value="effects-only">Sounds Only</option>
+              <option value="mute">Mute</option>
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Timer Precision</div>
+              <div class="setting-desc">Decimal places displayed</div>
+            </div>
+            <select id="setting-precision" class="custom-select" style="background: var(--bg-surface); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-subtle);">
+              <option value="2">0.01s (Standard WCA)</option>
+              <option value="3">0.001s (Milliseconds)</option>
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <div class="setting-label">Spacebar Hold Time</div>
+              <div class="setting-desc">Time held before timer turns green</div>
+            </div>
+            <select id="setting-hold-time" class="custom-select" style="background: var(--bg-surface); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-subtle);">
+              <option value="150">Fast (0.15s)</option>
+              <option value="300" selected>Normal (0.30s)</option>
+              <option value="550">Strict (0.55s)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">Data Backup & Export</div>
+          <div class="setting-row" style="gap: 10px; flex-wrap: wrap;">
+            <button id="btn-export-json" class="btn-scramble-action" style="flex: 1;">💾 Export Backup (JSON)</button>
+            <button id="btn-export-csv" class="btn-scramble-action" style="flex: 1;">📊 Export Solves (CSV)</button>
+          </div>
+          <div style="margin-top: 8px;">
+            <label class="btn-scramble-action" style="display: block; text-align: center; cursor: pointer;">
+              📂 Restore Backup (JSON)
+              <input type="file" id="file-import-json" accept=".json" style="display: none;">
+            </label>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Manual Entry Modal -->
+  <div id="manual-entry-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Enter Time Manually</h3>
+        <button id="btn-close-manual" class="btn-close-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="manual-entry-form" style="display: flex; flex-direction: column; gap: 16px;">
+          <div>
+            <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 6px;">Solve Time (e.g. 14.82 or 1:05.20)</label>
+            <input type="text" id="manual-time-input" class="alg-search-input" placeholder="0.00" autocomplete="off" required style="font-size: 1.25rem; font-family: var(--font-mono); text-align: center;">
+          </div>
+          <button type="submit" class="btn-scramble-action" style="background: var(--accent-primary); color: #fff; justify-content: center; padding: 10px; font-size: 0.95rem; border: none;">Save Solve</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Solve Details Modal -->
+  <div id="solve-details-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 id="modal-solve-number" class="modal-title">Solve #1</h3>
+        <button id="btn-close-details" class="btn-close-modal">✕</button>
+      </div>
+      <div class="modal-body" style="align-items: center; text-align: center;">
+        <div id="modal-solve-time" style="font-family: var(--font-mono); font-size: 3rem; font-weight: 800; color: var(--accent-primary);">12.45</div>
+        <div id="modal-solve-date" style="font-size: 0.85rem; color: var(--text-dim); margin-top: -10px;">Date & Time</div>
+        
+        <div style="width: 100%; margin-top: 10px; text-align: left;">
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; margin-bottom: 4px;">Scramble:</div>
+          <div id="modal-solve-scramble" style="font-family: var(--font-mono); font-size: 0.95rem; background: var(--bg-surface); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); word-break: break-all;"></div>
+        </div>
+
+        <div id="modal-solve-net" style="margin-top: 10px;"></div>
+
+        <button id="btn-copy-solve-details" class="btn-scramble-action" style="margin-top: 10px; width: 100%; justify-content: center;">📋 Copy Solve</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/audio.js"></script>
+  <script src="js/scrambler.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/chart.js"></script>
+  <script src="js/algorithms.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/friends.js"></script>
+  <script src="js/timer.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
